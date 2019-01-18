@@ -1,6 +1,6 @@
 /*
 *
-* Copyright (c) 2018 by blindtiger. All rights reserved.
+* Copyright (c) 2019 by blindtiger. All rights reserved.
 *
 * The contents of this file are subject to the Mozilla Public License Version
 * 2.0 (the "License")); you may not use this file except in compliance with
@@ -39,7 +39,6 @@ InitializePatchGuardBlock(
     HANDLE FileHandle = NULL;
     HANDLE SectionHandle = NULL;
     OBJECT_ATTRIBUTES ObjectAttributes = { 0 };
-    UNICODE_STRING ImageFileName = { 0 };
     IO_STATUS_BLOCK IoStatusBlock = { 0 };
     PVOID ViewBase = NULL;
     SIZE_T ViewSize = 0;
@@ -55,9 +54,12 @@ InitializePatchGuardBlock(
     PPOOL_BIG_PAGES * PageTable = NULL;
     PSIZE_T PageTableSize = NULL;
 
+    ULONG_PTR CompareField = 0;
+
     CHAR CmpAppendDllSection[] = "2e 48 31 11 48 31 51 08 48 31 51 10 48 31 51 18";
     CHAR Field[] = "fb 48 8d 05";
     CHAR FirstField[] = "?? 89 ?? 00 01 00 00 48 8D 05 ?? ?? ?? ?? ?? 89 ?? 08 01 00 00";
+    CHAR NextField[] = "48 8D 05 ?? ?? ?? ?? ?? 89 86 ?? ?? 00 00";
     CHAR KiStartSystemThread[] = "b9 01 00 00 00 44 0f 22 c1 48 8b 14 24 48 8b 4c 24 08";
     CHAR PspSystemThreadStartup[] = "eb ?? b9 1e 00 00 00 e8";
 
@@ -90,24 +92,31 @@ InitializePatchGuardBlock(
     };
 
     CHAR ClearEncryptedContextMessage[] =
-        "[Shark] < %p > PatchGuard encrypted context cleared reference count\n";
+        "[Sefirot] [Tiferet] < %p > PatchGuard encrypted context cleared reference count\n";
 
     CHAR RevertWorkerToSelfMessage[] =
-        "[Shark] < %p > PatchGuard declassified context cleared reference count\n";
+        "[Sefirot] [Tiferet] < %p > PatchGuard declassified context cleared reference count\n";
 
 #ifndef PUBLIC
     DbgPrint(
-        "[Shark] < %p > PatchGuard clear context PatchGuardBlock\n",
+        "[Sefirot] [Tiferet] < %p > PatchGuard clear context PatchGuardBlock\n",
         PatchGuardBlock);
 #endif // !PUBLIC
 
-    RtlInitUnicodeString(
-        &ImageFileName,
-        L"\\SystemRoot\\System32\\ntoskrnl.exe");
+    PatchGuardBlock->DbgPrint = GetKernelProcedureAddress(
+        PatchGuardBlock->KernelBase,
+        "DbgPrint",
+        0);
+
+#ifndef PUBLIC
+    DbgPrint(
+        "[Sefirot] [Tiferet] < %p > PatchGuard clear context DbgPrint\n",
+        PatchGuardBlock->DbgPrint);
+#endif // !PUBLIC
 
     InitializeObjectAttributes(
         &ObjectAttributes,
-        &ImageFileName,
+        &PatchGuardBlock->KernelDataTableEntry->FullDllName,
         (OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE),
         NULL,
         NULL);
@@ -176,7 +185,7 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
                                     DbgPrint(
-                                        "[Shark] < %p > PatchGuard clear context SizeOfCmpAppendDllSection\n",
+                                        "[Sefirot] [Tiferet] < %p > PatchGuard clear context SizeOfCmpAppendDllSection\n",
                                         PatchGuardBlock->SizeOfCmpAppendDllSection);
 #endif // !PUBLIC
 
@@ -188,7 +197,7 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
                                         DbgPrint(
-                                            "[Shark] < %p > PatchGuard clear context IsBtcEncryptedEnable\n",
+                                            "[Sefirot] [Tiferet] < %p > PatchGuard clear context IsBtcEncryptedEnable\n",
                                             PatchGuardBlock->IsBtcEncryptedEnable);
 #endif // !PUBLIC
                                     }
@@ -203,7 +212,7 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
                                 DbgPrint(
-                                    "[Shark] < %p > PatchGuard clear context RvaOffsetOfEntry\n",
+                                    "[Sefirot] [Tiferet] < %p > PatchGuard clear context RvaOffsetOfEntry\n",
                                     PatchGuardBlock->RvaOffsetOfEntry);
 #endif // !PUBLIC
                                 break;
@@ -250,7 +259,7 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
                         DbgPrint(
-                            "[Shark] < %p > PatchGuard clear context SizeOfNtSection\n",
+                            "[Sefirot] [Tiferet] < %p > PatchGuard clear context SizeOfNtSection\n",
                             PatchGuardBlock->SizeOfNtSection);
 #endif // !PUBLIC
                     }
@@ -275,10 +284,6 @@ InitializePatchGuardBlock(
                                 (ULONG64)__RVA_TO_VA(TargetPc - 4) + Diff;
 
 #ifndef PUBLIC
-                            DbgPrint(
-                                "[Shark] < %p > PatchGuard clear context CompareFields[0]\n",
-                                PatchGuardBlock->CompareFields[0]);
-
                             PrintSymbol((PVOID)PatchGuardBlock->CompareFields[0]);
 #endif // !PUBLIC
 
@@ -286,10 +291,6 @@ InitializePatchGuardBlock(
                                 (ULONG64)__RVA_TO_VA(TargetPc + 10) + Diff;
 
 #ifndef PUBLIC
-                            DbgPrint(
-                                "[Shark] < %p > PatchGuard clear context CompareFields[1]\n",
-                                PatchGuardBlock->CompareFields[1]);
-
                             PrintSymbol((PVOID)PatchGuardBlock->CompareFields[1]);
 #endif // !PUBLIC
 
@@ -297,10 +298,6 @@ InitializePatchGuardBlock(
                                 (ULONG64)__RVA_TO_VA(TargetPc + 24) + Diff;
 
 #ifndef PUBLIC
-                            DbgPrint(
-                                "[Shark] < %p > PatchGuard clear context CompareFields[2]\n",
-                                PatchGuardBlock->CompareFields[2]);
-
                             PrintSymbol((PVOID)PatchGuardBlock->CompareFields[2]);
 #endif // !PUBLIC
 
@@ -308,12 +305,66 @@ InitializePatchGuardBlock(
                                 (ULONG64)__RVA_TO_VA(TargetPc + 38) + Diff;
 
 #ifndef PUBLIC
-                            DbgPrint(
-                                "[Shark] < %p > PatchGuard clear context CompareFields[3]\n",
-                                PatchGuardBlock->CompareFields[3]);
-
                             PrintSymbol((PVOID)PatchGuardBlock->CompareFields[3]);
 #endif // !PUBLIC
+
+                            if (PatchGuardBlock->BuildNumber >= 9200) {
+                                while (TRUE) {
+                                    TargetPc = ScanBytes(
+                                        TargetPc,
+                                        (PCHAR)ViewBase + ViewSize,
+                                        NextField);
+
+                                    CompareField = (ULONG64)__RVA_TO_VA(TargetPc + 3) + Diff;
+
+                                    if ((ULONG_PTR)CompareField == (ULONG_PTR)PatchGuardBlock->DbgPrint) {
+                                        CompareField = (ULONG64)__RVA_TO_VA(TargetPc + 31) + Diff;
+
+                                        RtlCopyMemory(
+                                            &PatchGuardBlock->MmFreeIndependentPages,
+                                            &CompareField,
+                                            sizeof(PVOID));
+
+#ifndef PUBLIC
+                                        DbgPrint(
+                                            "[Sefirot] [Tiferet] < %p > PatchGuard clear context MmFreeIndependentPages\n",
+                                            PatchGuardBlock->MmFreeIndependentPages);
+#endif // !PUBLIC
+
+                                        break;
+                                    }
+
+                                    TargetPc++;
+                                }
+                            }
+
+                            while (TRUE) {
+                                TargetPc = ScanBytes(
+                                    TargetPc,
+                                    (PCHAR)ViewBase + ViewSize,
+                                    NextField);
+
+                                CompareField = (ULONG64)__RVA_TO_VA(TargetPc + 3) + Diff;
+
+                                if ((ULONG_PTR)CompareField == (ULONG_PTR)PatchGuardBlock->PsLoadedModuleList) {
+                                    CompareField = (ULONG64)__RVA_TO_VA(TargetPc - 11) + Diff;
+
+                                    RtlCopyMemory(
+                                        &PatchGuardBlock->PsInvertedFunctionTable,
+                                        &CompareField,
+                                        sizeof(PVOID));
+
+#ifndef PUBLIC
+                                    DbgPrint(
+                                        "[Sefirot] [Tiferet] < %p > PatchGuard clear context PsInvertedFunctionTable\n",
+                                        PatchGuardBlock->PsInvertedFunctionTable);
+#endif // !PUBLIC
+
+                                    break;
+                                }
+
+                                TargetPc++;
+                            }
 
                             break;
                         }
@@ -336,7 +387,7 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
                     DbgPrint(
-                        "[Shark] < %p > PatchGuard clear context KiStartSystemThread\n",
+                        "[Sefirot] [Tiferet] < %p > PatchGuard clear context KiStartSystemThread\n",
                         PatchGuardBlock->KiStartSystemThread);
 #endif // !PUBLIC
                 }
@@ -361,7 +412,7 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
                         DbgPrint(
-                            "[Shark] < %p > PatchGuard clear context PspSystemThreadStartup\n",
+                            "[Sefirot] [Tiferet] < %p > PatchGuard clear context PspSystemThreadStartup\n",
                             PatchGuardBlock->PspSystemThreadStartup);
 #endif // !PUBLIC
                     }
@@ -410,7 +461,7 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
                     DbgPrint(
-                        "[Shark] < %p > PatchGuard clear context MmDeterminePoolType\n",
+                        "[Sefirot] [Tiferet] < %p > PatchGuard clear context MmDeterminePoolType\n",
                         PatchGuardBlock->MmDeterminePoolType);
 #endif // !PUBLIC
 
@@ -477,15 +528,15 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
                             DbgPrint(
-                                "[Shark] < %p > PatchGuard clear context PoolBigPageTable\n",
+                                "[Sefirot] [Tiferet] < %p > PatchGuard clear context PoolBigPageTable\n",
                                 PatchGuardBlock->PoolBigPageTable);
 
                             DbgPrint(
-                                "[Shark] < %p > PatchGuard clear context PoolBigPageTableSize\n",
+                                "[Sefirot] [Tiferet] < %p > PatchGuard clear context PoolBigPageTableSize\n",
                                 PatchGuardBlock->PoolBigPageTableSize);
 
                             DbgPrint(
-                                "[Shark] < %p > PatchGuard clear context ExpLargePoolTableLock\n",
+                                "[Sefirot] [Tiferet] < %p > PatchGuard clear context ExpLargePoolTableLock\n",
                                 PatchGuardBlock->ExpLargePoolTableLock);
 #endif // !PUBLIC
 
@@ -532,7 +583,7 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
                     DbgPrint(
-                        "[Shark] < %p > PatchGuard clear context SystemPtes.BitMap\n",
+                        "[Sefirot] [Tiferet] < %p > PatchGuard clear context SystemPtes.BitMap\n",
                         PatchGuardBlock->SystemPtes.BitMap);
 #endif // !PUBLIC
 
@@ -547,7 +598,7 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
                     DbgPrint(
-                        "[Shark] < %p > PatchGuard clear context SystemPtes.BasePte\n",
+                        "[Sefirot] [Tiferet] < %p > PatchGuard clear context SystemPtes.BasePte\n",
                         PatchGuardBlock->SystemPtes.BasePte);
 #endif // !PUBLIC
 
@@ -566,30 +617,8 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
     DbgPrint(
-        "[Shark] < %p > PatchGuard clear context IoGetInitialStack\n",
+        "[Sefirot] [Tiferet] < %p > PatchGuard clear context IoGetInitialStack\n",
         PatchGuardBlock->IoGetInitialStack);
-#endif // !PUBLIC
-
-    PatchGuardBlock->ExAcquireSpinLockShared = GetKernelProcedureAddress(
-        PatchGuardBlock->KernelBase,
-        "ExAcquireSpinLockShared",
-        0);
-
-#ifndef PUBLIC
-    DbgPrint(
-        "[Shark] < %p > PatchGuard clear context ExAcquireSpinLockShared\n",
-        PatchGuardBlock->ExAcquireSpinLockShared);
-#endif // !PUBLIC
-
-    PatchGuardBlock->ExReleaseSpinLockShared = GetKernelProcedureAddress(
-        PatchGuardBlock->KernelBase,
-        "ExReleaseSpinLockShared",
-        0);
-
-#ifndef PUBLIC
-    DbgPrint(
-        "[Shark] < %p > PatchGuard clear context ExReleaseSpinLockShared\n",
-        PatchGuardBlock->ExReleaseSpinLockShared);
 #endif // !PUBLIC
 
     RtlCopyMemory(
@@ -612,17 +641,6 @@ InitializePatchGuardBlock(
 
     PatchGuardBlock->RevertWorkerToSelf = (PVOID)PatchGuardBlock->_RevertWorkerToSelf._ShellCode;
 
-    PatchGuardBlock->DbgPrint = GetKernelProcedureAddress(
-        PatchGuardBlock->KernelBase,
-        "DbgPrint",
-        0);
-
-#ifndef PUBLIC
-    DbgPrint(
-        "[Shark] < %p > PatchGuard clear context DbgPrint\n",
-        PatchGuardBlock->DbgPrint);
-#endif // !PUBLIC
-
     PatchGuardBlock->ClearEncryptedContextMessage = (PVOID)PatchGuardBlock->_Message[0];
 
     RtlCopyMemory(
@@ -644,7 +662,7 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
     DbgPrint(
-        "[Shark] < %p > PatchGuard clear context RtlCompareMemory\n",
+        "[Sefirot] [Tiferet] < %p > PatchGuard clear context RtlCompareMemory\n",
         PatchGuardBlock->RtlCompareMemory);
 #endif // !PUBLIC
 
@@ -655,7 +673,7 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
     DbgPrint(
-        "[Shark] < %p > PatchGuard clear context RtlRestoreContext\n",
+        "[Sefirot] [Tiferet] < %p > PatchGuard clear context RtlRestoreContext\n",
         PatchGuardBlock->RtlRestoreContext);
 #endif // !PUBLIC
 
@@ -666,7 +684,7 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
     DbgPrint(
-        "[Shark] < %p > PatchGuard clear context ExQueueWorkItem\n",
+        "[Sefirot] [Tiferet] < %p > PatchGuard clear context ExQueueWorkItem\n",
         PatchGuardBlock->ExQueueWorkItem);
 #endif // !PUBLIC
 
@@ -677,7 +695,7 @@ InitializePatchGuardBlock(
 
 #ifndef PUBLIC
     DbgPrint(
-        "[Shark] < %p > PatchGuard clear context ExFreePool\n",
+        "[Sefirot] [Tiferet] < %p > PatchGuard clear context ExFreePool\n",
         PatchGuardBlock->ExFreePool);
 #endif // !PUBLIC
 
@@ -710,7 +728,7 @@ SetNewEntryForEncryptedContext(
     ULONG64 FieldBuffer[PG_COMPARE_FIELDS_COUNT] = { 0 };
     ULONG FieldIndex = 0;
     ULONG Index = 0;
-    PCHAR ControlPc = NULL;
+    PJMPCODE JmpCode = NULL;
 
     // xor code must be align 8 byte;
     // get PatchGuard entry offset in encrypted code
@@ -766,11 +784,12 @@ SetNewEntryForEncryptedContext(
 
     // set temp buffer PatchGuard entry head jmp to _ClearEncryptedContext and encrypt
 
-    ControlPc = (PCHAR)FieldBuffer + (RvaOfEntry & 7);
+    JmpCode = (PJMPCODE)FieldBuffer + (RvaOfEntry & 7);
 
-    BuildJumpCode(
-        PatchGuardBlock->_ClearEncryptedContext._ShellCode,
-        &ControlPc);
+    RtlCopyMemory(JmpCode, JUMP_CODE64, JUMP_CODE64_LENGTH);
+
+    JmpCode->u1.JumpAddress = 
+        (ULONG_PTR)PatchGuardBlock->_ClearEncryptedContext._ShellCode;
 
     while (Index--) {
         FieldBuffer[Index] = FieldBuffer[Index] ^ LastRorKey;
@@ -787,7 +806,7 @@ SetNewEntryForEncryptedContext(
 
 #ifndef PUBLIC
     DbgPrint(
-        "[Shark] < %p > set new entry for PatchGuard encrypted context\n",
+        "[Sefirot] [Tiferet] < %p > set new entry for PatchGuard encrypted context\n",
         PatchGuardBlock->_ClearEncryptedContext._ShellCode);
 #endif // !PUBLIC
 
@@ -795,7 +814,7 @@ SetNewEntryForEncryptedContext(
 
 #ifndef PUBLIC
     DbgPrint(
-        "[Shark] < %p > reference count\n",
+        "[Sefirot] [Tiferet] < %p > reference count\n",
         PatchGuardBlock->ReferenceCount);
 #endif // !PUBLIC
 }
@@ -843,7 +862,7 @@ SetNewEntryForEncryptedWithBtcContext(
 
 found:
     if (RTL_SOFT_ASSERTMSG(
-        "[Shark] PatchGuard context entrypoint not found",
+        "[Sefirot] [Tiferet] PatchGuard context entrypoint not found",
         Index != CompareCount)) {
         FieldIndex = Index - (0 == (AlignOffset & 7) ? 0 : 1);
         LastRorKeyOffset = 2 + (0 == (AlignOffset & 7) ? 0 : 1);
@@ -886,7 +905,7 @@ found:
 
 #ifndef PUBLIC
         DbgPrint(
-            "[Shark] < %p > set new entry for PatchGuard encrypted with btc context\n",
+            "[Sefirot] [Tiferet] < %p > set new entry for PatchGuard encrypted with btc context\n",
             PatchGuardBlock->_ClearEncryptedContext._ShellCode);
 #endif // !PUBLIC
 
@@ -894,7 +913,7 @@ found:
 
 #ifndef PUBLIC
         DbgPrint(
-            "[Shark] < %p > reference count\n",
+            "[Sefirot] [Tiferet] < %p > reference count\n",
             PatchGuardBlock->ReferenceCount);
 #endif // !PUBLIC
     }
@@ -943,7 +962,7 @@ CompareEncryptedContextFields(
 
 #ifndef PUBLIC
                 DbgPrint(
-                    "[Shark] < %p > found PatchGuard declassified context\n",
+                    "[Sefirot] [Tiferet] < %p > found PatchGuard declassified context\n",
                     PatchGuardContext);
 #endif // !PUBLIC
                 break;
@@ -985,11 +1004,11 @@ CompareEncryptedContextFields(
 
 #ifndef PUBLIC
                         DbgPrint(
-                            "[Shark] < %p > found PatchGuard encrypted context\n",
+                            "[Sefirot] [Tiferet] < %p > found PatchGuard encrypted context\n",
                             PatchGuardContext);
 #endif // !PUBLIC
 
-                        if (PatchGuardBlock->IsBtcEncryptedEnable) {
+                        if (FALSE != PatchGuardBlock->IsBtcEncryptedEnable) {
                             SetNewEntryForEncryptedWithBtcContext(
                                 PatchGuardBlock,
                                 PatchGuardContext,
@@ -1004,10 +1023,9 @@ CompareEncryptedContextFields(
 
 #ifndef PUBLIC
                             DbgPrint(
-                                "[Shark] < %p > first rorkey\n",
+                                "[Sefirot] [Tiferet] < %p > first rorkey\n",
                                 RorKey);
 #endif // !PUBLIC
-
                             SetNewEntryForEncryptedContext(
                                 PatchGuardBlock,
                                 PatchGuardContext,
@@ -1075,11 +1093,19 @@ ClearSystemPtesEncryptedContext(
     [+0x000] List             [Type: _MMPTE_LIST]
     */
 
+#define VALID_PTE_SET_BITS \
+            ( MM_PTE_VALID_MASK | MM_PTE_WRITE_MASK | \
+                MM_PTE_ACCESS_MASK | MM_PTE_DIRTY_MASK)
+
+#define VALID_PTE_UNSET_BITS \
+            ( MM_PTE_OWNER_MASK | MM_PTE_WRITE_THROUGH_MASK | MM_PTE_CACHE_DISABLE_MASK | \
+                MM_PTE_LARGE_PAGE_MASK | MM_PTE_COPY_ON_WRITE_MASK | MM_PTE_PROTOTYPE_MASK )
+
     BasePte = BasePte + IntervalOfPtes * KeGetCurrentProcessorNumber();
 
 #ifndef PUBLIC
     DbgPrint(
-        "[Shark] < %02x : %p > pte start\n",
+        "[Sefirot] [Tiferet] < %02x : %p > pte start\n",
         KeGetCurrentProcessorNumber(),
         BasePte);
 #endif // !PUBLIC
@@ -1104,6 +1130,14 @@ ClearSystemPtesEncryptedContext(
                 }
 
                 if (FALSE == MI_IS_PTE_EXECUTABLE(PointerPte)) {
+                    break;
+                }
+
+                if (VALID_PTE_SET_BITS != (PointerPte->u.Long & VALID_PTE_SET_BITS)) {
+                    break;
+                }
+
+                if (0 != (PointerPte->u.Long & VALID_PTE_UNSET_BITS)) {
                     break;
                 }
             }
@@ -1139,7 +1173,7 @@ ClearPoolEncryptedContext(
 
 #ifndef PUBLIC
     DbgPrint(
-        "[Shark] < %02x : %p > page table start\n",
+        "[Sefirot] [Tiferet] < %02x : %p > page table start\n",
         KeGetCurrentProcessorNumber(),
         PoolBigPageTable);
 #endif // !PUBLIC
@@ -1164,7 +1198,7 @@ ClearPoolEncryptedContext(
     }
 }
 
-BOOLEAN
+CCHAR
 NTAPI
 GetContextRegion(
     __inout PPATCHGUARD_BLOCK PatchGuardBlock,
@@ -1173,7 +1207,7 @@ GetContextRegion(
     __out PSIZE_T RegionSize
 )
 {
-    BOOLEAN Result = FALSE;
+    BOOLEAN Result = 0;
     PMMPTE PointerPte = NULL;
     PFN_NUMBER Index = 0;
     PFN_NUMBER NumberOfPtes = 0;
@@ -1199,7 +1233,7 @@ GetContextRegion(
                         *BaseAddress = PatchGuardBlock->PoolBigPageTable[Index].Va;
                         *RegionSize = PatchGuardBlock->PoolBigPageTable[Index].NumberOfPages;
 
-                        Result = TRUE;
+                        Result = 1;
                         break;
                     }
                 }
@@ -1233,6 +1267,14 @@ GetContextRegion(
                     if (FALSE == MI_IS_PTE_EXECUTABLE(PointerPte)) {
                         break;
                     }
+
+                    if (VALID_PTE_SET_BITS != (PointerPte->u.Long & VALID_PTE_SET_BITS)) {
+                        break;
+                    }
+
+                    if (0 != (PointerPte->u.Long & VALID_PTE_UNSET_BITS)) {
+                        break;
+                    }
                 }
 
                 if ((ULONG64)VirtualAddress >= (ULONG64)LastVa &&
@@ -1240,7 +1282,7 @@ GetContextRegion(
                     *BaseAddress = LastVa;
                     *RegionSize = (SIZE_T)((PCHAR)PointerVa - (PCHAR)LastVa);
 
-                    Result = TRUE;
+                    Result = 2;
                     break;
                 }
             }
@@ -1267,6 +1309,7 @@ CheckWorkerThread(
     PVOID BaseAddress = NULL;
     SIZE_T RegionSize = 0;
     PVOID * Parameters = NULL;
+    CCHAR Type = 0;
 
     Callers = ExAllocatePool(
         NonPagedPool,
@@ -1290,7 +1333,7 @@ CheckWorkerThread(
             if (NULL != Callers[Count - 1].Establisher) {
 #ifndef PUBLIC
                 DbgPrint(
-                    "[Shark] < %p > found noimage return address in worker thread\n",
+                    "[Sefirot] [Tiferet] < %p > found noimage return address in worker thread\n",
                     Callers[Count - 1].Establisher);
 #endif // !PUBLIC
 
@@ -1309,11 +1352,13 @@ CheckWorkerThread(
                         // ExFrame->P3Home = PspSystemThreadStartup;
                         // ExFrame->Return = KiStartSystemThread; <- jmp this function return address == 0
 
-                        if (GetContextRegion(
+                        Type = GetContextRegion(
                             PatchGuardBlock,
                             Callers[Count - 1].Establisher,
                             &BaseAddress,
-                            &RegionSize)) {
+                            &RegionSize);
+
+                        if (0 != Type) {
                             for (Index = 0;
                                 Index < PG_MAXIMUM_CONTEXT_COUNT;
                                 Index++) {
@@ -1324,6 +1369,7 @@ CheckWorkerThread(
                                         &PatchGuardBlock->_GuardCall[Index],
                                         _PgGuardCall,
                                         sizeof(PatchGuardBlock->_GuardCall[Index]));
+
                                     PatchGuardBlock->_GuardCall[Index].PatchGuardBlock = PatchGuardBlock;
 
                                     Parameters = PatchGuardBlock->_GuardCall[Index].Parameters;
@@ -1331,12 +1377,13 @@ CheckWorkerThread(
                                     Parameters[0] = (PVOID)Callers[Count - 1].Establisher;
                                     Parameters[1] = (PVOID)BaseAddress;
                                     Parameters[2] = (PVOID)RegionSize;
+                                    Parameters[3] = (PVOID)Type;
 
                                     *TargetPc = (ULONG64)PatchGuardBlock->_GuardCall[Index]._ShellCode;
 
 #ifndef PUBLIC
                                     DbgPrint(
-                                        "[Shark] < %p > insert worker thread check function\n",
+                                        "[Sefirot] [Tiferet] < %p > insert worker thread check function\n",
                                         PatchGuardBlock->_GuardCall[Index]._ShellCode);
 #endif // !PUBLIC
 
@@ -1344,7 +1391,7 @@ CheckWorkerThread(
 
 #ifndef PUBLIC
                                     DbgPrint(
-                                        "[Shark] < %p > reference count\n",
+                                        "[Sefirot] [Tiferet] < %p > reference count\n",
                                         PatchGuardBlock->ReferenceCount);
 #endif // !PUBLIC
 
@@ -1502,34 +1549,31 @@ ClearPatchGuardWorker(
     __inout PPATCHGUARD_BLOCK PatchGuardBlock
 )
 {
-    PMMPTE BasePte = NULL;
     PFN_NUMBER IntervalOfPtes = 0;
-    PPOOL_BIG_PAGES PoolBigPageTable = NULL;
     SIZE_T IntervalOfTable = 0;
 
 #ifndef PUBLIC
     DbgPrint(
-        "[Shark] < %p > number of processors\n",
+        "[Sefirot] [Tiferet] < %p > number of processors\n",
         PatchGuardBlock->NumberProcessors);
 #endif // !PUBLIC
 
-    BasePte = PatchGuardBlock->SystemPtes.BasePte;
-
-    IntervalOfPtes = PatchGuardBlock->SystemPtes.BitMap->SizeOfBitMap / PatchGuardBlock->NumberProcessors;
+    IntervalOfPtes =
+        PatchGuardBlock->SystemPtes.BitMap->SizeOfBitMap / PatchGuardBlock->NumberProcessors;
 
     IpiGenericCall(
         (PPS_APC_ROUTINE)ClearSystemPtesEncryptedContext,
         (PKSYSTEM_ROUTINE)PatchGuardBlock,
-        (PUSER_THREAD_START_ROUTINE)BasePte,
+        (PUSER_THREAD_START_ROUTINE)PatchGuardBlock->SystemPtes.BasePte,
         (PVOID)IntervalOfPtes);
 
-    PoolBigPageTable = PatchGuardBlock->PoolBigPageTable;
-    IntervalOfTable = PatchGuardBlock->PoolBigPageTableSize / PatchGuardBlock->NumberProcessors;
+    IntervalOfTable =
+        PatchGuardBlock->PoolBigPageTableSize / PatchGuardBlock->NumberProcessors;
 
     IpiGenericCall(
         (PPS_APC_ROUTINE)ClearPoolEncryptedContext,
         (PKSYSTEM_ROUTINE)PatchGuardBlock,
-        (PUSER_THREAD_START_ROUTINE)PoolBigPageTable,
+        (PUSER_THREAD_START_ROUTINE)PatchGuardBlock->PoolBigPageTable,
         (PVOID)IntervalOfTable);
 
     CheckAllWorkerThread(PatchGuardBlock);
@@ -1543,46 +1587,37 @@ DisablePatchGuard(
     __inout PPATCHGUARD_BLOCK PatchGuardBlock
 )
 {
-    // after PatchGuard logic is interrupted not trigger again.
-    // so no need to continue running.
-
     InitializePatchGuardBlock(PatchGuardBlock);
 
     if (RTL_SOFT_ASSERTMSG(
-        "[Shark] PatchGuardBlock->IoGetInitialStack not found",
+        "[Sefirot] [Tiferet] PatchGuardBlock->IoGetInitialStack not found",
         NULL != PatchGuardBlock->IoGetInitialStack) ||
         RTL_SOFT_ASSERTMSG(
-            "[Shark] PatchGuardBlock->AcquireSpinLockShared not found",
-            NULL != PatchGuardBlock->ExAcquireSpinLockShared) ||
-        RTL_SOFT_ASSERTMSG(
-            "[Shark] PatchGuardBlock->ReleaseSpinLockShared not found",
-            NULL != PatchGuardBlock->ExReleaseSpinLockShared) ||
-        RTL_SOFT_ASSERTMSG(
-            "[Shark] PatchGuardBlock->RvaOffsetOfEntry not found",
+            "[Sefirot] [Tiferet] PatchGuardBlock->RvaOffsetOfEntry not found",
             0 != PatchGuardBlock->RvaOffsetOfEntry) ||
         RTL_SOFT_ASSERTMSG(
-            "[Shark] PatchGuardBlock->SizeOfCmpAppendDllSection not found",
+            "[Sefirot] [Tiferet] PatchGuardBlock->SizeOfCmpAppendDllSection not found",
             0 != PatchGuardBlock->SizeOfCmpAppendDllSection) ||
         RTL_SOFT_ASSERTMSG(
-            "[Shark] PatchGuardBlock->SizeOfNtSection not found",
+            "[Sefirot] [Tiferet] PatchGuardBlock->SizeOfNtSection not found",
             0 != PatchGuardBlock->SizeOfNtSection) ||
         RTL_SOFT_ASSERTMSG(
-            "[Shark] PatchGuardBlock->PoolBigPageTable not found",
+            "[Sefirot] [Tiferet] PatchGuardBlock->PoolBigPageTable not found",
             NULL != PatchGuardBlock->PoolBigPageTable) ||
         RTL_SOFT_ASSERTMSG(
-            "[Shark] PatchGuardBlock->PoolBigPageTableSize not found",
+            "[Sefirot] [Tiferet] PatchGuardBlock->PoolBigPageTableSize not found",
             0 != PatchGuardBlock->PoolBigPageTableSize) ||
         RTL_SOFT_ASSERTMSG(
-            "[Shark] PatchGuardBlock->ExpLargePoolTableLock not found",
+            "[Sefirot] [Tiferet] PatchGuardBlock->ExpLargePoolTableLock not found",
             NULL != PatchGuardBlock->ExpLargePoolTableLock) ||
         RTL_SOFT_ASSERTMSG(
-            "[Shark] PatchGuardBlock->SystemPtesState not found",
+            "[Sefirot] [Tiferet] PatchGuardBlock->SystemPtes.BitMap not found",
             NULL != PatchGuardBlock->SystemPtes.BitMap) ||
         RTL_SOFT_ASSERTMSG(
-            "[Shark] PatchGuardBlock->SystemPtesState not found",
+            "[Sefirot] [Tiferet] PatchGuardBlock->SystemPtes.BasePte not found",
             NULL != PatchGuardBlock->SystemPtes.BasePte) ||
         RTL_SOFT_ASSERTMSG(
-            "[Shark] PatchGuardBlock->MmDeterminePoolType not found",
+            "[Sefirot] [Tiferet] PatchGuardBlock->MmDeterminePoolType not found",
             NULL != PatchGuardBlock->MmDeterminePoolType)) {
         KeInitializeEvent(
             &PatchGuardBlock->Notify,
