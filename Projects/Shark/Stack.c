@@ -1,6 +1,6 @@
 /*
 *
-* Copyright (c) 2018 by blindtiger. All rights reserved.
+* Copyright (c) 2019 by blindtiger. All rights reserved.
 *
 * The contents of this file are subject to the Mozilla Public License Version
 * 2.0 (the "License")); you may not use this file except in compliance with
@@ -21,81 +21,6 @@
 #include "Stack.h"
 
 #include "Reload.h"
-
-#ifndef _WIN64
-DECLSPEC_NOINLINE
-ULONG
-NTAPI
-WalkFrameChain(
-    __out PCALLERS Callers,
-    __in ULONG Count
-)
-{
-    ULONG Fp = 0;
-    ULONG Index = 0;
-
-    _asm mov Fp, ebp;
-
-    while (Index < Count &&
-        MmIsAddressValid((PVOID)Fp)) {
-        Callers[Index].Establisher = (PVOID)(*(PULONG)(Fp + 4));
-        Callers[Index].EstablisherFrame = (PVOID *)(Fp + 8);
-
-        Index += 1;
-        Fp = *(PULONG)Fp;
-    }
-
-    return Index;
-}
-#else
-DECLSPEC_NOINLINE
-ULONG
-NTAPI
-WalkFrameChain(
-    __out PCALLERS Callers,
-    __in ULONG Count
-)
-{
-    CONTEXT ContextRecord = { 0 };
-    PVOID HandlerData = NULL;
-    ULONG Index = 0;
-    PRUNTIME_FUNCTION FunctionEntry = NULL;
-    ULONG64 ImageBase = 0;
-    ULONG64 EstablisherFrame = 0;
-
-    RtlCaptureContext(&ContextRecord);
-
-    while (Index < Count &&
-        MmIsAddressValid((PVOID)ContextRecord.Rip)) {
-        FunctionEntry = RtlLookupFunctionEntry(
-            ContextRecord.Rip,
-            &ImageBase,
-            NULL);
-
-        if (NULL != FunctionEntry) {
-            RtlVirtualUnwind(
-                UNW_FLAG_NHANDLER,
-                ImageBase,
-                ContextRecord.Rip,
-                FunctionEntry,
-                &ContextRecord,
-                &HandlerData,
-                &EstablisherFrame,
-                NULL);
-
-            Callers[Index].Establisher = (PVOID)ContextRecord.Rip;
-            Callers[Index].EstablisherFrame = (PVOID *)EstablisherFrame;
-
-            Index += 1;
-        }
-        else {
-            break;
-        }
-    }
-
-    return Index;
-}
-#endif // !_WIN64
 
 PSTR
 NTAPI
@@ -191,7 +116,7 @@ PrintSymbol(
         if (0 == (ULONG64)Address - (ULONG64)ProcedureAddress) {
 #ifndef PUBLIC
             DbgPrint(
-                "[Shark] < %p > < %wZ!%hs >\n",
+                "[Sefirot] [Tiferet] < %p > < %wZ!%hs >\n",
                 Address,
                 &DataTableEnry->BaseDllName,
                 ProcedureName);
@@ -200,7 +125,7 @@ PrintSymbol(
         else {
 #ifndef PUBLIC
             DbgPrint(
-                "[Shark] < %p > < %wZ!%hs + 0x%x >\n",
+                "[Sefirot] [Tiferet] < %p > < %wZ!%hs + 0x%x >\n",
                 Address,
                 &DataTableEnry->BaseDllName,
                 ProcedureName,
@@ -211,7 +136,7 @@ PrintSymbol(
     else if (NULL != DataTableEnry) {
 #ifndef PUBLIC
         DbgPrint(
-            "[Shark] < %p > < %wZ!%s + 0x%x >\n",
+            "[Sefirot] [Tiferet] < %p > < %wZ!%s + 0x%x >\n",
             Address,
             &DataTableEnry->BaseDllName,
             (ULONG64)Address - (ULONG64)DataTableEnry->DllBase);
@@ -220,7 +145,7 @@ PrintSymbol(
     else {
 #ifndef PUBLIC
         DbgPrint(
-            "[Shark] < %p >\n",
+            "[Sefirot] [Tiferet] < %p >\n",
             Address);
 #endif // !PUBLIC
     }
